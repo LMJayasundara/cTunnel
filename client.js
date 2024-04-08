@@ -10,6 +10,50 @@ const connected_master_clients = new Map();
 const handleUserInput = require('./lib/system');
 const getSystemInfo = require('./lib/info');
 
+// Ping-Pong Mechanism
+let pingInterval;
+let pongTimeout;
+
+function startPingPong() {
+  pingInterval = setInterval(() => {
+    console.log('Sending ping to server');
+    socket.emit('ping_custom'); // Use a custom event for ping
+
+    // Wait for pong within 5 seconds
+    pongTimeout = setTimeout(() => {
+      console.log('Pong not received, attempting to reconnect...');
+      attemptReconnect();
+    }, 5000); // Adjust the timeout as needed
+  }, 5000); // Send ping every 5 seconds
+}
+
+function stopPingPong() {
+  clearInterval(pingInterval);
+  clearTimeout(pongTimeout);
+}
+
+function attemptReconnect() {
+  stopPingPong(); // Stop the ping-pong process
+  socket.disconnect(); // Disconnect the current connection
+  socket.connect(); // Attempt to reconnect
+}
+
+socket.on('connect', () => {
+  console.log('Connected to server');
+  startPingPong(); // Start the ping-pong process
+});
+
+socket.on('disconnect', () => {
+  console.log('Disconnected from server');
+  stopPingPong(); // Stop the ping-pong process
+});
+
+// Handle pong response from the server
+socket.on('pong_custom', () => {
+  console.log('Pong received from server');
+  clearTimeout(pongTimeout); // Clear the pong timeout
+});
+
 // Function to get directory contents using ssh2
 function getDirectoryContentsSsh2(connection, directory) {
     try {
