@@ -1,6 +1,6 @@
 const URL = 'http://13.200.84.116:80';
 const io = require('socket.io-client');
-const username = "A0007";
+const username = "ID001";
 const ss = require('socket.io-stream');
 let socket = io(URL);
 var ssh2 = require("ssh2");
@@ -15,44 +15,31 @@ let pingInterval;
 let pongTimeout;
 
 function startPingPong() {
-  pingInterval = setInterval(() => {
-    console.log('Sending ping to server');
-    socket.emit('ping_custom'); // Use a custom event for ping
+    pingInterval = setInterval(() => {
+        console.log('Sending ping to server');
+        socket.emit('ping_custom', {
+            id: username
+        }); // Use a custom event for ping
 
-    // Wait for pong within 5 seconds
-    pongTimeout = setTimeout(() => {
-      console.log('Pong not received, attempting to reconnect...');
-      attemptReconnect();
-    }, 5000); // Adjust the timeout as needed
-  }, 5000); // Send ping every 5 seconds
+        // Wait for pong within 5 seconds
+        pongTimeout = setTimeout(() => {
+            console.log('Pong not received, attempting to reconnect...');
+            attemptReconnect();
+        }, 5000); // Adjust the timeout as needed
+    }, 5000); // Send ping every 5 seconds
 }
 
 function stopPingPong() {
-  clearInterval(pingInterval);
-  clearTimeout(pongTimeout);
+    clearInterval(pingInterval);
+    clearTimeout(pongTimeout);
 }
 
 function attemptReconnect() {
-  stopPingPong(); // Stop the ping-pong process
-  socket.disconnect(); // Disconnect the current connection
-  socket.connect(); // Attempt to reconnect
+    stopPingPong(); // Stop the ping-pong process
+    //   socket.disconnect(); // Disconnect the current connection
+    //   socket.connect(); // Attempt to reconnect
+    startPingPong();
 }
-
-socket.on('connect', () => {
-  console.log('Connected to server');
-  startPingPong(); // Start the ping-pong process
-});
-
-socket.on('disconnect', () => {
-  console.log('Disconnected from server');
-  stopPingPong(); // Stop the ping-pong process
-});
-
-// Handle pong response from the server
-socket.on('pong_custom', () => {
-  console.log('Pong received from server');
-  clearTimeout(pongTimeout); // Clear the pong timeout
-});
 
 // Function to get directory contents using ssh2
 function getDirectoryContentsSsh2(connection, directory) {
@@ -92,21 +79,28 @@ socket.on('connect', () => {
         key: "A123B"
     });
 
-    socket.on('con-masterId', (data) =>{
-        connected_master_clients.set(data.masterId, {"winSts": false});
+    startPingPong();
+    // Handle pong response from the server
+    socket.on('pong_custom', () => {
+        console.log('Pong received from server');
+        clearTimeout(pongTimeout); // Clear the pong timeout
     });
 
-    socket.on('dis-masterId', (data) =>{
+    socket.on('con-masterId', (data) => {
+        connected_master_clients.set(data.masterId, { "winSts": false });
+    });
+
+    socket.on('dis-masterId', (data) => {
         connected_master_clients.delete(data.masterId);
     });
 
-    socket.on('getInfo', (data) =>{
+    socket.on('getInfo', (data) => {
         getSystemInfo().then((info) => {
             socket.emit('sysInfo', {
                 masterId: data.masterId,
                 info: info
             });
-        }).catch(()=>{
+        }).catch(() => {
             console.log("error");
         })
     });
@@ -163,7 +157,7 @@ socket.on('connect', () => {
 
     // SSH handle
     socket.on('openssh', (data) => {
-        connected_master_clients.set(data.masterId, {"winSts": true});
+        connected_master_clients.set(data.masterId, { "winSts": true });
         const sshConnection = new ssh2.Client();
         console.log(`connect ${data.termId}`);
         sshConnection.on('ready', function () {
@@ -208,7 +202,7 @@ socket.on('connect', () => {
 
     // FTP handle
     socket.on('opensftp', (data) => {
-        connected_master_clients.set(data.masterId, {"winSts": true});
+        connected_master_clients.set(data.masterId, { "winSts": true });
         const sshConnection = new ssh2.Client();
         sshConnection.on('ready', function () {
             // Use getDirectoryContentsSsh2 function to get directory contents
@@ -223,7 +217,7 @@ socket.on('connect', () => {
                         sftpId: data.sftpId,
                     });
                 })
-                .finally(()=>{
+                .finally(() => {
                     sshConnection.destroy();
                 })
         });
@@ -243,7 +237,7 @@ socket.on('connect', () => {
     });
 
     socket.on('window-close', (data) => {
-        connected_master_clients.set(data.masterId, {"winSts": false});
+        connected_master_clients.set(data.masterId, { "winSts": false });
     });
 
     socket.on('reboot', (data) => {
@@ -251,9 +245,9 @@ socket.on('connect', () => {
         const isConnected = Array.from(connected_master_clients.values()).some((sts) => {
             return sts.winSts === true;
         });
-        
-        console.log(isConnected);      
-        if(isConnected == false){
+
+        console.log(isConnected);
+        if (isConnected == false) {
             handleUserInput('reboot');
         } else {
             socket.emit('errormsg', {
@@ -261,16 +255,16 @@ socket.on('connect', () => {
                 ttl: "Reboot Error!",
                 msg: "Another user is connected!",
             });
-        }  
+        }
     });
 
     socket.on('shoutdown', (data) => {
         const isConnected = Array.from(connected_master_clients.values()).some((sts) => {
             return sts.winSts === true;
         });
-        
-        console.log(isConnected);      
-        if(isConnected == false){
+
+        console.log(isConnected);
+        if (isConnected == false) {
             handleUserInput('shutdown');
         } else {
             socket.emit('errormsg', {
@@ -278,10 +272,11 @@ socket.on('connect', () => {
                 ttl: "Shoutdown Error!",
                 msg: "Another user is connected!",
             });
-        } 
+        }
     });
 });
 
 socket.on('disconnect', () => {
     console.log('disconnected from server');
+    stopPingPong();
 });
