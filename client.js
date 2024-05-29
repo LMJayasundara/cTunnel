@@ -1,6 +1,6 @@
 const URL = 'http://13.200.84.116:80';
 const io = require('socket.io-client');
-const username = "ID001";
+const username = "A0000";
 const ss = require('socket.io-stream');
 let socket = io(URL);
 var ssh2 = require("ssh2");
@@ -36,8 +36,6 @@ function stopPingPong() {
 
 function attemptReconnect() {
     stopPingPong(); // Stop the ping-pong process
-    //   socket.disconnect(); // Disconnect the current connection
-    //   socket.connect(); // Attempt to reconnect
     startPingPong();
 }
 
@@ -79,7 +77,7 @@ socket.on('connect', () => {
         key: "A123B"
     });
 
-    startPingPong();
+    // startPingPong();
     // Handle pong response from the server
     socket.on('pong_custom', () => {
         console.log('Pong received from server');
@@ -108,7 +106,6 @@ socket.on('connect', () => {
     // FTP handle
     ss(socket).on('file', (stream, data) => {
         try {
-            // console.log(data.name);
             const filepath = data.name;
             stream.pipe(fs.createWriteStream(filepath));
             stream.on('end', () => console.log(`file saved to ${filepath}`));
